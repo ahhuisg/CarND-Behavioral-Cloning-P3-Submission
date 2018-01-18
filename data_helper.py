@@ -18,6 +18,12 @@ def add_image(file_name, measurement, v_adj):
     return image, measurement + v_adj
 
 def generate_batch(batch_size=64):
+    """
+        Generator to generate next batch data for training and validation
+        Each batch consists of batch_size number of rows
+        Each row contains 3 images from center, left and right respectively
+        A steering adjustment value is applied for left and right images
+    """
     while True:
         images = []
         measurements = []
@@ -46,7 +52,10 @@ def generate_batch(batch_size=64):
 
         yield x_train, y_train
 
+
 def flip(x_train, y_train):
+    #Flip images and add to training set
+
     images = []
     measures = []
     for image, measure in zip(x_train, y_train):
@@ -59,6 +68,7 @@ def flip(x_train, y_train):
         measures.append(-measure)
     
     return np.array(images), np.array(measures)
+
 
 def crop(x_train, y_train):
     images = []
@@ -74,6 +84,8 @@ def crop(x_train, y_train):
 
 
 def resize_vgg19(x_train, y_train):
+    # reside input image to be the size that VGG19 model expects
+
     images = []
     measures = []
     
