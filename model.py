@@ -1,108 +1,17 @@
-import numpy as np
-import matplotlib.image as mpimg
-
 from keras.models import Sequential
 from keras.layers.convolutional import Convolution2D
 from keras.layers.convolutional import MaxPooling2D
 from keras.layers.convolutional import AveragePooling2D
-
 from keras.layers.core import Activation
 from keras.layers.core import Flatten
 from keras.layers.core import Dense
 from keras.layers.core import Dropout
 from keras.layers.core import Lambda
-
-import csv
-import cv2
-from PIL import Image
-
-images = []
-measurements = []
-
-#data_dirs = ['test1', 'test2', 'test3']
-data_dirs = ['org']
-
-counter = 0
-
-def add_image(file_name, measurement):
-    image = mpimg.imread(img_dir+'IMG/'+file_name)
-    
-    images.append(image)
-    measurements.append(measurement)
-
-    #image_flipped = np.fliplr(image)
-    #images.append(image_flipped)
-    #measurement_flipped = -measurement
-    #measurements.append(measurement_flipped)
-
-for dt in data_dirs:
-    img_dir = 'data/'+dt+'/'
-    
-    print ('Processing data directory: '+img_dir)
-    with open(img_dir+'driving_log.csv') as csvfile:
-        reader = csv.reader(csvfile)
-        for line in reader:
-            if counter > 10:
-                pass
-                
-            center_file_name = line[0].split('/')[-1]
-            left_file_name = line[1].split('/')[-1]
-            right_file_name = line[2].split('/')[-1]
-            measure = float(line[3])
-            add_image(center_file_name,measure)
-            #add_image(left_file_name,(measure+0.2))
-            #add_image(right_file_name,(measure-0.2))
-            counter = counter + 1
-
-x_train = np.array(images)
-y_train = np.array(measurements)
-
-
-from scipy.misc import imresize
-
-def flip(x_train, y_train):
-    images = []
-    measures = []
-    for image, measure in zip(x_train, y_train):
-        image_flipped = np.fliplr(image)
-        
-        images.append(image)
-        measures.append(measure)
-        
-        images.append(image_flipped)
-        measures.append(-measure)
-    
-    return np.array(images), np.array(measures)
-
-def crop(x_train, y_train):
-    images = []
-    measures = []
-    
-    for image, measure in zip(x_train, y_train):
-        cropped_img = image[70:-25,]
-        
-        images.append(cropped_img)
-        measures.append(measure)
-        
-    return np.array(images), np.array(measures)
-
-
-def resize_vgg19(x_train, y_train):
-    images = []
-    measures = []
-    
-    for image, measure in zip(x_train, y_train):
-        img1 = imresize(image, (224, 224))
-        
-        images.append(img1)
-        measures.append(measure)
-        
-    return np.array(images), np.array(measures)
-
-
 from keras.applications import VGG19
 from keras.layers import Input, Dropout, BatchNormalization
 from keras.models import Model
+
+import data_helper as dh
 
 def cust_vgg19():
     input_image = Input(shape = (224,224,3))
@@ -173,11 +82,26 @@ def nvidia_model():
 
 
 print ('Starting training with NVIDIA model')
-x_train = x_train/255 - 0.5
-x_train, y_train = flip(x_train, y_train)
 
 model = nvidia_model()
 model.compile(loss='mse', optimizer='adam')
+
+"""
+x_train = x_train/255 - 0.5
+x_train, y_train = flip(x_train, y_train)
 model.fit(x_train, y_train, validation_split=0.1, shuffle=True, nb_epoch=10)
 model.save('model_nvidia.h5')
+"""
 
+train_generator = dh.generate_batch()
+validate_generator = dh.generate_batch()
+
+total_num_samples = dh.total_num_data_rows() * 6
+
+history = model.fit_generator(train_generator,
+                              samples_per_epoch=total_num_samples,
+                              nb_epoch=10,
+                              validation_data=validate_generator,
+                              nb_val_samples=2560)
+
+model.save('model_nvidia_gen.h5')
